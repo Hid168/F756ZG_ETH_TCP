@@ -1,0 +1,9 @@
+core_cm7.h:2147:34:__NVIC_SystemReset	4	static,ignoring_inline_asm
+TCPServer.c:27:7:get_temperature	4	static
+TCPServer.c:32:6:handle_command	88	static
+TCPServer.c:72:6:send_reply	32	static
+TCPServer.c:82:6:close_connection	24	static
+TCPServer.c:90:14:tcp_server_recv	568	static
+TCPServer.c:130:14:tcp_server_accept	32	static
+TCPServer.c:151:6:tcpCommandTask	544	static
+TCPServer.c:179:6:tcp_server_init	48	static

@@ -264,14 +264,6 @@ void StartDefaultTask(void *argument)
   MX_LWIP_Init();
   /* USER CODE BEGIN 5 */
 
-  /* Set static IP */
-  IP4_ADDR(&gnetif.ip_addr, 192,168,2,40);
-  IP4_ADDR(&gnetif.netmask, 255,255,255,0);
-  IP4_ADDR(&gnetif.gw, 192,168,2,254);
-
-  netif_set_addr(&gnetif, &gnetif.ip_addr, &gnetif.netmask, &gnetif.gw);
-  netif_set_up(&gnetif);
-
   /* Wait for Ethernet link up */
   while(!netif_is_link_up(&gnetif)) {
       osDelay(100);
@@ -286,7 +278,7 @@ void StartDefaultTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-
+      sys_check_timeouts();
       osDelay(500);
   }
   /* USER CODE END 5 */

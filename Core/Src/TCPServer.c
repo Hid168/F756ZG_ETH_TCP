@@ -49,17 +49,12 @@ void handle_command(const char *cmd, char *response, size_t len)
     } else if (strcasecmp(cmd, "INFO") == 0) {
         snprintf(response, len, "STM32 TCP Server\r\nPort: %d\r\nFirmware: v1.0\r\nStatus: %s\r\n",
                  SERVER_PORT, status);
-    } else if (strcasecmp(cmd, "ALARM TEST") == 0) {
-        snprintf(response, len, "!!! TEST ALARM ACTIVE !!!\r\n");
-        HAL_Delay(200);
-        NVIC_SystemReset();
     } else if (strcasecmp(cmd, "HELP") == 0) {
         snprintf(response, len,
                  "Available commands:\r\n"
                  " STATUS / TEMP  - Show temperature and status\r\n"
                  " LED ON / OFF   - Control LED\r\n"
                  " INFO           - Show system info\r\n"
-                 " ALARM TEST     - Simulate alarm\r\n"
                  " EXIT           - Close connection\r\n");
     } else if (strcasecmp(cmd, "EXIT") == 0) {
         snprintf(response, len, "Goodbye!\r\n");
@@ -68,31 +63,51 @@ void handle_command(const char *cmd, char *response, size_t len)
     }
 }
 
+static err_t tcp_server_close(struct tcp_pcb *tpcb)
+{
+    tcp_arg(tpcb, NULL);
+    tcp_sent(tpcb, NULL);
+    tcp_recv(tpcb, NULL);
+    tcp_err(tpcb, NULL);
+    tcp_poll(tpcb, NULL, 0);
+
+    return tcp_close(tpcb);
+}
+
+static void tcp_server_error(void *arg, err_t err)
+{
+    LWIP_UNUSED_ARG(arg);
+    LWIP_UNUSED_ARG(err);
+}
+
 // --- tcpip_callback functions ---
 void send_reply(void *arg)
 {
     tcp_reply_t *msg = (tcp_reply_t*)arg;
 
-    tcp_write(msg->pcb, msg->reply, strlen(msg->reply), TCP_WRITE_FLAG_COPY);
+    tcp_write(msg->pcb, msg->reply,
+              strlen(msg->reply),
+              TCP_WRITE_FLAG_COPY);
+
     tcp_output(msg->pcb);
 
-    free(msg);
-}
+    if (strncmp(msg->reply, "Goodbye!", 8) == 0)
+    {
+        tcp_server_close(msg->pcb);
+    }
 
-void close_connection(void *arg)
-{
-    tcp_reply_t *msg = (tcp_reply_t*)arg;
-    tcp_close(msg->pcb);
     free(msg);
 }
 
 // --- TCP receive callback ---
 static err_t tcp_server_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err)
 {
-    if (!p) {
-        tcp_close(tpcb);
-        return ERR_OK;
-    }
+	if (!p || err != ERR_OK) {
+	    if (p) pbuf_free(p);
+	    tcp_arg(tpcb, NULL);
+	    tcp_recv(tpcb, NULL);
+	    return ERR_OK;
+	}
 
     char buffer[MAX_CMD_LEN] = {0};
     size_t offset = 0;
@@ -133,6 +148,7 @@ static err_t tcp_server_accept(void *arg, struct tcp_pcb *newpcb, err_t err)
     LWIP_UNUSED_ARG(err);
 
     tcp_recv(newpcb, tcp_server_recv);
+    tcp_err(newpcb, tcp_server_error);
     tcp_nagle_disable(newpcb);
     newpcb->so_options |= SOF_KEEPALIVE;
 
@@ -164,13 +180,6 @@ void tcpCommandTask(void *argument)
             replyMsg->reply[MAX_CMD_LEN-1] = 0;
 
             tcpip_callback(send_reply, replyMsg);
-
-            if (strcasecmp(msg.cmd, "EXIT") == 0) {
-                tcp_reply_t *closeMsg = malloc(sizeof(tcp_reply_t));
-                closeMsg->pcb = msg.pcb;
-                closeMsg->reply[0] = 0;
-                tcpip_callback(close_connection, closeMsg);
-            }
         }
     }
 }

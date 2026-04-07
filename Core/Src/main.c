@@ -63,6 +63,13 @@ const osThreadAttr_t clientTask_attributes = {
   .stack_size = 1024*4,
     .priority = (osPriority_t) osPriorityNormal,
 };
+
+const osThreadAttr_t lwipPump_attributes = {
+  .name = "LwipInput",
+  .stack_size = 1024 * 4,
+  .priority = (osPriority_t) osPriorityHigh,
+};
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -72,12 +79,13 @@ static void MX_GPIO_Init(void);
 void StartDefaultTask(void *argument);
 
 /* USER CODE BEGIN PFP */
+void LwipInputTask(void *argument);
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-struct netif gnetif;
+extern struct netif gnetif;
 
 /* USER CODE END 0 */
 
@@ -144,6 +152,7 @@ int main(void)
 
   /* Create the thread(s) */
   /* creation of defaultTask */
+
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
@@ -248,7 +257,15 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-
+void LwipInputTask(void *argument)
+{
+    for(;;)
+    {
+        ethernetif_input(&gnetif);   // lees inkomende frames
+        sys_check_timeouts();        // verwerk LWIP timers
+        osDelay(1);
+    }
+}
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartDefaultTask */
@@ -278,7 +295,6 @@ void StartDefaultTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-      sys_check_timeouts();
       osDelay(500);
   }
   /* USER CODE END 5 */
